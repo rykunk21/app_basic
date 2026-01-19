@@ -1,0 +1,28 @@
+FROM rust:1.89-bullseye
+
+# Install dev tools and curl for healthcheck
+RUN apt-get update && apt-get install -y curl git && rm -rf /var/lib/apt/lists/*
+
+# Install wasm target for frontend
+RUN rustup target add wasm32-unknown-unknown
+
+# Install cargo-watch and trunk with matching wasm-bindgen version
+RUN cargo install cargo-watch --version 8.5.2
+RUN cargo install trunk --locked --version 0.21.4
+RUN cargo install wasm-bindgen-cli --version 0.2.95
+
+# Verify installations
+RUN cargo watch --version && trunk --version && wasm-bindgen --version
+
+# Set working directory to project root
+WORKDIR /usr/src/app
+
+RUN mkdir -p /usr/src/app/frontend/target
+
+# Expose backend and frontend ports
+EXPOSE 8000 8080
+
+# Clear trunk cache and run both watchers
+CMD rm -rf /root/.cache/trunk && \
+    cargo watch -w backend -x 'run -p backend' & \
+    cd frontend && exec trunk serve --address 0.0.0.0 --port 8080 --proxy-backend=http://localhost:8000

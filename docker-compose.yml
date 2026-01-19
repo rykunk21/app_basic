@@ -1,0 +1,48 @@
+version: "3.9"
+services:
+  surrealdb:
+    image: surrealdb/surrealdb:latest
+    container_name: surrealdb
+    command: start --log debug --user root --pass root --bind 0.0.0.0:8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - surrealdb_data:/data
+    networks:
+      - backend_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/status"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 5s
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.${ENV:-dev}
+    depends_on:
+      - surrealdb
+    env_file:
+      - .env/.env.${ENV:-dev}
+    environment:
+      DATABASE_URL: "ws://surrealdb:8080"
+      ROCKET_ADDRESS: "0.0.0.0"
+    ports:
+      - "8000:8000"
+      - "8081:8080"
+    networks:
+      - backend_network
+    volumes:
+      - ./:/usr/src/app:rw
+      - cargo_cache:/usr/local/cargo/registry
+      - cargo_git:/usr/local/cargo/git
+
+volumes:
+  surrealdb_data:
+  cargo_cache:
+  cargo_git:
+
+networks:
+  backend_network:
+    driver: bridge
