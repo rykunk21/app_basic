@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use std::collections::HashMap;
-use wasm_bindgen::JsCast; // <-- for dyn_into
+use wasm_bindgen::JsCast;
 use web_sys::window;
 
 #[derive(Deserialize, Debug)]

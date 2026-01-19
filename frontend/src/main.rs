@@ -1,6 +1,5 @@
 use yew::prelude::*;
 
-mod components;
 mod theme;
 
 use components::{
