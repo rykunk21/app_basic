@@ -1,0 +1,25 @@
+# Rust / Yew build artifacts
+/target
+
+# Frontend build output
+/frontend/dist
+
+# Node.js dependencies
+/node_modules
+
+# Cargo lockfile (optional: usually committed for apps)
+/Cargo.lock
+
+# npm debug / logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary / OS files
+.DS_Store
+Thumbs.db
+
+# Optional: editor configs
+.vscode/
+.idea/
+
