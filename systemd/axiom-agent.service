@@ -1,0 +1,30 @@
+[Unit]
+Description=Axiom Agent - Autonomous Kanban Worker
+After=network.target
+
+[Service]
+Type=simple
+User=axiom
+WorkingDirectory=/home/axiom/.openclaw/workspace
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+Environment="OPENCLAW_SESSION=axiom-worker"
+Environment="GITHUB_TOKEN_FILE=/home/axiom/.config/gh/hosts.yml"
+
+# Run agent in continuous loop
+ExecStart=/usr/bin/node /home/axiom/.openclaw/workspace/agent-daemon.js
+
+# Restart on failure
+Restart=always
+RestartSec=10
+
+# Resource limits
+MemoryMax=2G
+CPUQuota=200%
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=axiom-agent
+
+[Install]
+WantedBy=multi-user.target
