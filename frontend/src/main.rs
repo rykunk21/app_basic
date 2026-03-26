@@ -2,24 +2,13 @@ use yew::prelude::*;
 
 mod theme;
 
-use components::{
-    about::About, audience::Audience, contact::Contact, header::Header, hero::Hero,
-    process::Process, services::Services,
-};
-
 #[function_component(App)]
 fn app() -> Html {
     theme::apply_palette();
 
     html! {
         <>
-            <Header />
-            <Hero />
-            <Services />
-            <Process />
-            <Audience />
-            <About />
-            <Contact />
+            <h1>{"Hello World"}</h1>
         </>
     }
 }
