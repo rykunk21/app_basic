@@ -1,0 +1,70 @@
+name: Kanban Automation
+
+on:
+  issues:
+    types: [opened, labeled]
+  pull_request:
+    types: [opened, edited, closed]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  repository-projects: write
+
+jobs:
+  manage-kanban:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add backlog issues to project
+        if: github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'backlog')
+        uses: actions/add-to-project@v0.5.0
+        with:
+          project-url: https://github.com/users/rykunk21/projects/5
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+
+      - name: Move issue to Red phase
+        if: github.event_name == 'pull_request' && github.event.action == 'opened'
+        run: |
+          # Extract issue number from PR body or branch name
+          ISSUE_NUM=$(echo "${{ github.event.pull_request.body }}" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
+          if [ -n "$ISSUE_NUM" ]; then
+            gh issue edit "$ISSUE_NUM" \
+              --repo ${{ github.repository }} \
+              --add-label "red" \
+              --remove-label "backlog" \
+              || true
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Move issue to Green phase on PR synchronize
+        if: github.event_name == 'pull_request' && github.event.action == 'synchronize'
+        run: |
+          ISSUE_NUM=$(echo "${{ github.event.pull_request.body }}" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
+          if [ -n "$ISSUE_NUM" ]; then
+            gh issue edit "$ISSUE_NUM" \
+              --repo ${{ github.repository }} \
+              --add-label "green" \
+              --remove-label "red" \
+              || true
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Move issue to Done phase on PR merge
+        if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+        run: |
+          ISSUE_NUM=$(echo "${{ github.event.pull_request.body }}" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
+          if [ -n "$ISSUE_NUM" ]; then
+            gh issue edit "$ISSUE_NUM" \
+              --repo ${{ github.repository }} \
+              --add-label "done" \
+              --remove-label "green,refactor" \
+              || true
+            gh issue close "$ISSUE_NUM" \
+              --repo ${{ github.repository }} \
+              || true
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
