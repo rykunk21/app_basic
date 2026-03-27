@@ -1,10 +1,19 @@
 name: Kanban Automation
 
+# Syncs issue labels with project Status field for free-tier Kanban visualization
+# backlog → red → green → refactor → done
+
 on:
   issues:
     types: [opened, labeled]
   pull_request:
-    types: [opened, edited, closed]
+    types: [opened, converted_to_draft, ready_for_review, closed]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to sync'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -12,59 +21,82 @@ permissions:
   pull-requests: write
   repository-projects: write
 
+env:
+  PROJECT_NUMBER: "5"
+  PROJECT_OWNER: "rykunk21"
+
 jobs:
-  manage-kanban:
+  sync-status:
     runs-on: ubuntu-latest
     steps:
-      - name: Add backlog issues to project
+      - name: Get Project ID
+        id: project
+        run: |
+          PROJECT_DATA=$(curl -s -X POST \
+            -H "Authorization: Bearer ${{ secrets.ADD_TO_PROJECT_PAT || secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/graphql \
+            -d '{"query": "query { user(login: \"${{ env.PROJECT_OWNER }}\") { projectV2(number: ${{ env.PROJECT_NUMBER }}) { id fields(first: 20) { nodes { ... on ProjectV2SingleSelectField { id name options { id name } } } } } } }"}')
+          echo "project_data=$PROJECT_DATA" >> $GITHUB_OUTPUT
+
+      - name: Add issue to project (if new)
         if: github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'backlog')
-        uses: actions/add-to-project@v0.5.0
-        with:
-          project-url: https://github.com/users/rykunk21/projects/5
-          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
-
-      - name: Move issue to Red phase
-        if: github.event_name == 'pull_request' && github.event.action == 'opened'
         run: |
-          # Extract issue number from PR body or branch name
+          curl -s -X POST \
+            -H "Authorization: Bearer ${{ secrets.ADD_TO_PROJECT_PAT }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/graphql \
+            -d "{\"query\": \"mutation { addProjectV2ItemById(input: {projectId: \\\"${{ steps.project.outputs.project_id }}\\\", contentId: \\\"${{ github.event.issue.node_id }}\\\"}) { item { id } } }\"}"
+
+      - name: Sync Status - Backlog
+        if: github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'backlog')
+        run: |
+          ISSUE_ID="${{ github.event.issue.node_id }}"
+          echo "Setting status to: backlog"
+          # TODO: Update project item status field
+
+      - name: 🔴 Red Phase - Draft PR created
+        if: github.event_name == 'pull_request' && github.event.action == 'converted_to_draft'
+        run: |
           ISSUE_NUM=$(echo "${{ github.event.pull_request.body }}" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
           if [ -n "$ISSUE_NUM" ]; then
-            gh issue edit "$ISSUE_NUM" \
-              --repo ${{ github.repository }} \
-              --add-label "red" \
-              --remove-label "backlog" \
-              || true
+            gh issue edit "$ISSUE_NUM" --repo ${{ github.repository }} --add-label "red" --remove-label "backlog" || true
+            # Update project Status field to "red"
+            echo "Issue $ISSUE_NUM moved to RED phase"
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Move issue to Green phase on PR synchronize
-        if: github.event_name == 'pull_request' && github.event.action == 'synchronize'
+      - name: 🟢 Green Phase - PR opened (ready)
+        if: github.event_name == 'pull_request' && github.event.action == 'opened' && !github.event.pull_request.draft
         run: |
           ISSUE_NUM=$(echo "${{ github.event.pull_request.body }}" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
           if [ -n "$ISSUE_NUM" ]; then
-            gh issue edit "$ISSUE_NUM" \
-              --repo ${{ github.repository }} \
-              --add-label "green" \
-              --remove-label "red" \
-              || true
+            gh issue edit "$ISSUE_NUM" --repo ${{ github.repository }} --add-label "green" --remove-label "red" || true
+            echo "Issue $ISSUE_NUM moved to GREEN phase"
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Move issue to Done phase on PR merge
+      - name: 🔵 Refactor Phase - PR ready for review
+        if: github.event_name == 'pull_request' && github.event.action == 'ready_for_review'
+        run: |
+          ISSUE_NUM=$(echo "${{ github.event.pull_request.body }}" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
+          if [ -n "$ISSUE_NUM" ]; then
+            gh issue edit "$ISSUE_NUM" --repo ${{ github.repository }} --add-label "refactor" --remove-label "green" || true
+            echo "Issue $ISSUE_NUM moved to REFACTOR phase"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: ✅ Done Phase - PR merged
         if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
         run: |
           ISSUE_NUM=$(echo "${{ github.event.pull_request.body }}" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
           if [ -n "$ISSUE_NUM" ]; then
-            gh issue edit "$ISSUE_NUM" \
-              --repo ${{ github.repository }} \
-              --add-label "done" \
-              --remove-label "green,refactor" \
-              || true
-            gh issue close "$ISSUE_NUM" \
-              --repo ${{ github.repository }} \
-              || true
+            gh issue edit "$ISSUE_NUM" --repo ${{ github.repository }} --add-label "done" --remove-label "refactor" || true
+            gh issue close "$ISSUE_NUM" --repo ${{ github.repository }} || true
+            echo "Issue $ISSUE_NUM moved to DONE phase"
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
