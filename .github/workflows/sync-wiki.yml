@@ -1,0 +1,63 @@
+name: Sync Wiki
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "wiki/**"
+  workflow_dispatch: # Manual trigger
+
+concurrency:
+  group: wiki-sync
+  cancel-in-progress: true
+
+jobs:
+  sync-wiki:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to wiki
+        run: |
+          # Configure git
+          git config --global user.name "autoaxiom[bot]"
+          git config --global user.email "autoaxiom@users.noreply.github.com"
+          
+          # The wiki is a separate repo at OWNER/REPO.wiki.git
+          WIKI_URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.wiki.git"
+          
+          # Clone the wiki
+          git clone "$WIKI_URL" wiki-repo || true
+          
+          # If wiki doesn't exist yet, create it
+          if [ ! -d "wiki-repo/.git" ]; then
+            mkdir -p wiki-repo
+            cd wiki-repo
+            git init
+            git remote add origin "$WIKI_URL"
+            cd ..
+          fi
+          
+          # Copy wiki files
+          cp wiki/* wiki-repo/ 2>/dev/null || true
+          
+          # If Home.md exists, also create it as the default page
+          if [ -f "wiki/Home.md" ]; then
+            cp wiki/Home.md wiki-repo/Home.md
+          fi
+          
+          # Commit and push
+          cd wiki-repo
+          git add -A
+          
+          # Only commit if there are changes
+          if git diff --cached --quiet; then
+            echo "No wiki changes to sync"
+          else
+            git commit -m "Sync wiki from ${{ github.repository }}@${{ github.sha }}"
+            git push origin master --force
+            echo "Wiki synced successfully"
+          fi
