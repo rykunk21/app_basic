@@ -3,7 +3,6 @@
 
 use yew::prelude::*;
 use gloo_console::log;
-use web_sys::{HtmlElement, HtmlAnchorElement};
 
 use crate::types::*;
 
@@ -57,7 +56,7 @@ pub fn issue_card(props: &IssueCardProps) -> Html {
         .unwrap_or_else(|| "https://github.com/ghost.png".to_string());
 
     // Get first label color
-    let color = issue.labels.first().map(|l| format!("#{}", l.color))
+    let _color = issue.labels.first().map(|l| format!("#{}", l.color))
         .unwrap_or_else(|| "#8B8B8B".to_string());
 
     html! {
