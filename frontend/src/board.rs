@@ -2,11 +2,7 @@
 //! Drag-and-drop enabled columns for each TDD phase
 
 use yew::prelude::*;
-use yew::html::DragEvent;
-use gloo_net::http::Request;
-use gloo_console::log;
-use wasm_bindgen_futures::spawn_local;
-use web_sys::HtmlElement;
+use web_sys::DragEvent;
 
 use crate::types::*;
 use crate::card::IssueCard;
@@ -15,7 +11,7 @@ use crate::nlp_panel::NlpPanel;
 #[derive(Properties, PartialEq, Clone)]
 pub struct KanbanBoardProps {
     pub board: KanbanBoardData,
-    pub on_move: Callback<(MoveRequest)>,
+    pub on_move: Callback<MoveRequest>,
 }
 
 #[function_component(KanbanBoard)]
@@ -23,6 +19,8 @@ pub fn kanban_board(props: &KanbanBoardProps) -> Html {
     let board = props.board.clone();
     let on_move = props.on_move.clone();
 
+    let board_for_nlp = board.clone();
+    
     html! {
         <div class="kanban-board">
             <div class="board-columns">
@@ -39,13 +37,13 @@ pub fn kanban_board(props: &KanbanBoardProps) -> Html {
                                 id={col_id.to_string()}
                                 title={title.to_string()}
                                 issues={issues}
-                                {on_move.clone()}
+                                on_move={on_move.clone()}
                             />
                         }
                     })
                 }
             </div>
-            <NlpPanel board={board.clone()} />
+            <NlpPanel board={board_for_nlp} />
         </div>
     }
 }

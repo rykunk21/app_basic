@@ -9,6 +9,7 @@ use wasm_bindgen_futures::spawn_local;
 
 mod board;
 mod card;
+mod components;
 mod nlp_panel;
 mod types;
 
